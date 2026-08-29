@@ -27,9 +27,9 @@ async function run() {
 
     // Send a ping to confirm a successful connection
     app.post('/api/doctors', async (req, res) => {
-      const { doctorsEmail, availableDays, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization } = req.body
+      const { doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization } = req.body
       const addData = {
-        doctorsEmail, availableDays, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization, createdAt: new Date(), status: 'active'
+        doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization, createdAt: new Date(), status: 'active'
       }
       const result = await doctorCollection.insertOne(addData)
       return res.send(result)
@@ -48,7 +48,6 @@ async function run() {
 
         const {
           doctorsEmail,
-          availableDays,
           consultationFee,
           doctorName,
           experience,
@@ -56,12 +55,11 @@ async function run() {
           profileImage,
           qualifications,
           specialization,
-          availableSlots
+
         } = req.body;
 
         const updateData = {
           doctorsEmail,
-          availableDays,
           consultationFee,
           doctorName,
           experience,
@@ -69,7 +67,7 @@ async function run() {
           profileImage,
           qualifications,
           specialization,
-          availableSlots,
+
           updatedAt: new Date(),
           status: "active"
         };
@@ -90,6 +88,65 @@ async function run() {
 
         res.status(500).send({
           message: "Failed to update doctor profile"
+        });
+      }
+    });
+
+
+    app.post('/api/doctors/:email/schedule', async (req, res) => {
+      try {
+        const { email } = req.params;
+
+        const { workingDays, appointmentHours } = req.body;
+
+        if (
+          !workingDays ||
+          !Array.isArray(workingDays) ||
+          workingDays.length === 0 ||
+          !appointmentHours ||
+          !Array.isArray(appointmentHours) ||
+          appointmentHours.length === 0
+        ) {
+          return res.status(400).send({
+            message: "Working days and appointment hours are required"
+          });
+        }
+
+        const newSchedule = {
+          workingDays,
+          appointmentHours
+        };
+
+        const result = await doctorCollection.updateOne(
+          {
+            doctorsEmail: email
+          },
+          {
+            $set: {
+              schedule: newSchedule,
+              updatedAt: new Date()
+            }
+          }
+        );
+
+        console.log("MongoDB result:", result);
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({
+            message: "Doctor not found"
+          });
+        }
+
+        res.status(201).send({
+          message: "Schedule added successfully",
+          schedule: newSchedule
+        });
+
+      } catch (error) {
+        console.error("Add schedule error:", error);
+
+        res.status(500).send({
+          message: "Failed to add schedule"
         });
       }
     });
