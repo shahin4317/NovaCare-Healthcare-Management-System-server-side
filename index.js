@@ -1,5 +1,5 @@
 const express = require('express');
-const { MongoClient, ServerApiVersion } = require('mongodb')
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const app = express();
 const cors = require('cors')
 require('dotenv').config()
@@ -27,15 +27,72 @@ async function run() {
 
     // Send a ping to confirm a successful connection
     app.post('/api/doctors', async (req, res) => {
-      const { availableDays,consultationFee, doctorName, experience, hospitalName, profileImage,qualifications, specialization}=req.body
-      const addData= {availableDays,consultationFee, doctorName, experience, hospitalName, profileImage,qualifications, specialization,createdAt:new Date(),status:'active'
+      const { doctorsEmail, availableDays, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization } = req.body
+      const addData = {
+        doctorsEmail, availableDays, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization, createdAt: new Date(), status: 'active'
       }
       const result = await doctorCollection.insertOne(addData)
       return res.send(result)
     })
 
     // get the doctor profile 
-    
+    app.get('/api/doctors/:email', async (req, res) => {
+      const { email } = req.params
+      const result = await doctorCollection.findOne({ doctorsEmail: email })
+      res.send(result)
+    })
+    //update doctors profile
+    app.patch('/api/doctors/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const {
+          doctorsEmail,
+          availableDays,
+          consultationFee,
+          doctorName,
+          experience,
+          hospitalName,
+          profileImage,
+          qualifications,
+          specialization,
+          availableSlots
+        } = req.body;
+
+        const updateData = {
+          doctorsEmail,
+          availableDays,
+          consultationFee,
+          doctorName,
+          experience,
+          hospitalName,
+          profileImage,
+          qualifications,
+          specialization,
+          availableSlots,
+          updatedAt: new Date(),
+          status: "active"
+        };
+
+        const result = await doctorCollection.updateOne(
+          {
+            _id: new ObjectId(id)
+          },
+          {
+            $set: updateData
+          }
+        );
+
+        res.send(result);
+
+      } catch (error) {
+        console.error("Update doctor error:", error);
+
+        res.status(500).send({
+          message: "Failed to update doctor profile"
+        });
+      }
+    });
 
 
 
