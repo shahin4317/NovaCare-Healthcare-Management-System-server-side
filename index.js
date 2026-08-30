@@ -273,6 +273,12 @@ async function run() {
       const result = await cursore.toArray()
       res.send(result)
     })
+  app.get('/api/doctors/details/:id', async(req,res)=>{
+    const {id} = req.params
+    const result = await doctorCollection.findOne({_id: new ObjectId(id)})
+    res.send(result)
+
+  })
 
 
 
