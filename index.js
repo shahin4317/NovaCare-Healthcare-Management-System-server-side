@@ -151,6 +151,84 @@ async function run() {
       }
     });
 
+    app.get('/api/doctors/:email/schedule', async (req, res) => {
+      const { email } = req.params
+      const result = await doctorCollection.findOne({ doctorsEmail: email },
+        { projection: { schedule: 1 } })
+      res.send(result)
+    })
+
+
+
+    app.patch("/api/doctors/:id/schedule", async (req, res) => {
+      
+      try {
+        const { id } = req.params;
+        console.log(id,'ajskdfjkl');
+
+        // Check valid MongoDB ObjectId
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({
+            success: false,
+            message: "Invalid doctor ID",
+          });
+        }
+        
+
+        const { workingDays, appointmentHours } = req.body;
+
+        // Validate data
+        if (
+          !Array.isArray(workingDays) ||
+          !Array.isArray(appointmentHours)
+        ) {
+          return res.status(400).send({
+            success: false,
+            message: "Invalid schedule data",
+          });
+        }
+
+        const result = await doctorCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $set: {
+              schedule: {
+                workingDays,
+                appointmentHours,
+              },
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({
+            success: false,
+            message: "Doctor not found",
+          });
+        }
+
+        res.send({
+          success: true,
+          message: "Schedule updated successfully",
+          result,
+        });
+
+      } catch (error) {
+        console.error("Update doctor schedule error:", error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to update doctor schedule",
+          error: error.message,
+        });
+      }
+    });
+
+
+
 
 
 
