@@ -34,7 +34,6 @@ async function run() {
       const result = await doctorCollection.insertOne(addData)
       return res.send(result)
     })
-
     // get the doctor profile 
     app.get('/api/doctors/:email', async (req, res) => {
       const { email } = req.params
@@ -91,8 +90,6 @@ async function run() {
         });
       }
     });
-
-
     app.post('/api/doctors/:email/schedule', async (req, res) => {
       try {
         const { email } = req.params;
@@ -150,21 +147,17 @@ async function run() {
         });
       }
     });
-
     app.get('/api/doctors/:email/schedule', async (req, res) => {
       const { email } = req.params
       const result = await doctorCollection.findOne({ doctorsEmail: email },
         { projection: { schedule: 1 } })
       res.send(result)
     })
-
-
-
     app.patch("/api/doctors/:id/schedule", async (req, res) => {
-      
+
       try {
         const { id } = req.params;
-        console.log(id,'ajskdfjkl');
+        console.log(id, 'ajskdfjkl');
 
         // Check valid MongoDB ObjectId
         if (!ObjectId.isValid(id)) {
@@ -173,7 +166,7 @@ async function run() {
             message: "Invalid doctor ID",
           });
         }
-        
+
 
         const { workingDays, appointmentHours } = req.body;
 
@@ -226,7 +219,60 @@ async function run() {
         });
       }
     });
+    app.delete("/api/doctors/:id/schedule", async (req, res) => {
+      try {
+        const { id } = req.params;
 
+        // Check ObjectId
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({
+            success: false,
+            message: "Invalid doctor ID",
+          });
+        }
+
+        // Only remove schedule
+        const result = await doctorCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $unset: {
+              schedule: "",
+            },
+            $set: {
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        // Doctor doesn't exist
+        if (result.matchedCount === 0) {
+          return res.status(404).send({
+            success: false,
+            message: "Doctor not found",
+          });
+        }
+
+        res.send({
+          success: true,
+          message: "Schedule deleted successfully",
+        });
+
+      } catch (error) {
+        console.error("Delete schedule error:", error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to delete schedule",
+        });
+      }
+    });
+    app.get('/api/doctors', async(req,res)=>{
+      const cursore = doctorCollection.find()
+      const result = await cursore.toArray()
+      res.send(result)
+    })
 
 
 
