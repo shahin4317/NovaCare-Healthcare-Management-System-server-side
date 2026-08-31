@@ -24,20 +24,21 @@ async function run() {
     // const doctorCollection =database.collection('doctor')
     const db = client.db('novacareUser')
     const doctorCollection = db.collection('doctors')
+    const appointmentsCollection = db.collection('appointments')
 
     // Send a ping to confirm a successful connection
     app.post('/api/doctors', async (req, res) => {
-      const { doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization } = req.body
+      const { doctorsId, doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization } = req.body
       const addData = {
-        doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization, createdAt: new Date(), status: 'active'
+        doctorsId, doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization, createdAt: new Date(), status: 'active'
       }
       const result = await doctorCollection.insertOne(addData)
       return res.send(result)
     })
     // get the doctor profile 
-    app.get('/api/doctors/:email', async (req, res) => {
-      const { email } = req.params
-      const result = await doctorCollection.findOne({ doctorsEmail: email })
+    app.get('/api/doctors/:id', async (req, res) => {
+      const { id } = req.params
+      const result = await doctorCollection.findOne({ doctorsId: id })
       res.send(result)
     })
     //update doctors profile
@@ -70,14 +71,9 @@ async function run() {
           updatedAt: new Date(),
           status: "active"
         };
-
         const result = await doctorCollection.updateOne(
-          {
-            _id: new ObjectId(id)
-          },
-          {
-            $set: updateData
-          }
+          { doctorsId: id },
+          { $set: updateData }
         );
 
         res.send(result);
@@ -90,9 +86,9 @@ async function run() {
         });
       }
     });
-    app.post('/api/doctors/:email/schedule', async (req, res) => {
+    app.post('/api/doctors/:id/schedule', async (req, res) => {
       try {
-        const { email } = req.params;
+        const { id } = req.params;
 
         const { workingDays, appointmentHours } = req.body;
 
@@ -116,7 +112,7 @@ async function run() {
 
         const result = await doctorCollection.updateOne(
           {
-            doctorsEmail: email
+            doctorsId: id
           },
           {
             $set: {
@@ -147,106 +143,49 @@ async function run() {
         });
       }
     });
-    app.get('/api/doctors/:email/schedule', async (req, res) => {
-      const { email } = req.params
-      const result = await doctorCollection.findOne({ doctorsEmail: email },
+    app.get('/api/doctors/:id/schedule', async (req, res) => {
+      const { id } = req.params
+      const result = await doctorCollection.findOne({ doctorsId: id },
         { projection: { schedule: 1 } })
       res.send(result)
     })
     app.patch("/api/doctors/:id/schedule", async (req, res) => {
-
       try {
         const { id } = req.params;
-        console.log(id, 'ajskdfjkl');
-
-        // Check valid MongoDB ObjectId
-        if (!ObjectId.isValid(id)) {
-          return res.status(400).send({
-            success: false,
-            message: "Invalid doctor ID",
-          });
-        }
-
 
         const { workingDays, appointmentHours } = req.body;
 
-        // Validate data
-        if (
-          !Array.isArray(workingDays) ||
-          !Array.isArray(appointmentHours)
-        ) {
-          return res.status(400).send({
-            success: false,
-            message: "Invalid schedule data",
-          });
+        if (!Array.isArray(workingDays) || !Array.isArray(appointmentHours)) {
+          return res.status(400).send({ success: false, message: "Invalid schedule data" });
         }
 
         const result = await doctorCollection.updateOne(
-          {
-            _id: new ObjectId(id),
-          },
-          {
-            $set: {
-              schedule: {
-                workingDays,
-                appointmentHours,
-              },
-              updatedAt: new Date(),
-            },
-          }
+          { doctorsId: id },   // ✅ ঠিক
+          { $set: { schedule: { workingDays, appointmentHours }, updatedAt: new Date() } }
         );
 
         if (result.matchedCount === 0) {
-          return res.status(404).send({
-            success: false,
-            message: "Doctor not found",
-          });
+          return res.status(404).send({ success: false, message: "Doctor not found" });
         }
 
-        res.send({
-          success: true,
-          message: "Schedule updated successfully",
-          result,
-        });
-
+        res.send({ success: true, message: "Schedule updated successfully", result });
       } catch (error) {
         console.error("Update doctor schedule error:", error);
-
-        res.status(500).send({
-          success: false,
-          message: "Failed to update doctor schedule",
-          error: error.message,
-        });
+        res.status(500).send({ success: false, message: "Failed to update doctor schedule", error: error.message });
       }
     });
     app.delete("/api/doctors/:id/schedule", async (req, res) => {
       try {
         const { id } = req.params;
 
-        // Check ObjectId
-        if (!ObjectId.isValid(id)) {
-          return res.status(400).send({
-            success: false,
-            message: "Invalid doctor ID",
-          });
-        }
-
-        // Only remove schedule
         const result = await doctorCollection.updateOne(
+          { doctorsId: id },          // ✅ ঠিক
           {
-            _id: new ObjectId(id),
-          },
-          {
-            $unset: {
-              schedule: "",
-            },
-            $set: {
-              updatedAt: new Date(),
-            },
+            $unset: { schedule: "" },
+            $set: { updatedAt: new Date() },
           }
         );
 
-        // Doctor doesn't exist
         if (result.matchedCount === 0) {
           return res.status(404).send({
             success: false,
@@ -261,25 +200,54 @@ async function run() {
 
       } catch (error) {
         console.error("Delete schedule error:", error);
-
         res.status(500).send({
           success: false,
           message: "Failed to delete schedule",
         });
       }
     });
-    app.get('/api/doctors', async(req,res)=>{
+    app.get('/api/doctors', async (req, res) => {
       const cursore = doctorCollection.find()
       const result = await cursore.toArray()
       res.send(result)
     })
-  app.get('/api/doctors/details/:id', async(req,res)=>{
-    const {id} = req.params
-    const result = await doctorCollection.findOne({_id: new ObjectId(id)})
-    res.send(result)
+    app.get('/api/doctors/details/:id', async (req, res) => {
+      const { id } = req.params
+      const result = await doctorCollection.findOne({ _id: new ObjectId(id) })
+      res.send(result)
 
-  })
+    })
 
+    //  Appointments related 
+    app.post('/api/appointments', async (req, res) => {
+      const { patientId,patientEmail, doctorId, appointmentDate, appointmentTime, appointmentStatus, symptoms, paymentStatus } = req.body
+      const addData = { patientId,patientEmail, doctorId, appointmentDate, appointmentTime, appointmentStatus, symptoms, paymentStatus,createdAt: new Date() }
+      const result = await appointmentsCollection.insertOne(addData)
+      res.send(result)
+    })
+
+    app.get("/api/appointments", async (req, res) => {
+  try {
+    const { doctorId } = req.query;
+
+    console.log("Received doctorId:", doctorId); // ← ডিবাগের জন্য
+
+    if (!doctorId) {
+      return res.status(400).send({ message: "doctorId is required" });
+    }
+
+    const appointments = await appointmentsCollection
+      .find({ doctorId: doctorId })
+      .toArray();
+
+    console.log("Found appointments:", appointments.length); // ← কয়টা পাওয়া গেল
+
+    res.send(appointments);
+  } catch (error) {
+    console.error("Get appointments error:", error);
+    res.status(500).send({ message: "Failed to fetch appointments", error: error.message });
+  }
+});
 
 
 
