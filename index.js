@@ -25,12 +25,13 @@ async function run() {
     const db = client.db('novacareUser')
     const doctorCollection = db.collection('doctors')
     const appointmentsCollection = db.collection('appointments')
+    const paymentCollection = db.collection('payments')
 
     // Send a ping to confirm a successful connection
     app.post('/api/doctors', async (req, res) => {
-      const { doctorsId, doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization } = req.body
+      const { doctorId, doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization } = req.body
       const addData = {
-        doctorsId, doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization, createdAt: new Date(), status: 'active'
+        doctorId, doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization, createdAt: new Date(), status: 'active'
       }
       const result = await doctorCollection.insertOne(addData)
       return res.send(result)
@@ -38,7 +39,7 @@ async function run() {
     // get the doctor profile 
     app.get('/api/doctors/:id', async (req, res) => {
       const { id } = req.params
-      const result = await doctorCollection.findOne({ doctorsId: id })
+      const result = await doctorCollection.findOne({ doctorId: id })
       res.send(result)
     })
     //update doctors profile
@@ -72,7 +73,7 @@ async function run() {
           status: "active"
         };
         const result = await doctorCollection.updateOne(
-          { doctorsId: id },
+          { doctorId: id },
           { $set: updateData }
         );
 
@@ -112,7 +113,7 @@ async function run() {
 
         const result = await doctorCollection.updateOne(
           {
-            doctorsId: id
+            doctorId: id
           },
           {
             $set: {
@@ -145,7 +146,7 @@ async function run() {
     });
     app.get('/api/doctors/:id/schedule', async (req, res) => {
       const { id } = req.params
-      const result = await doctorCollection.findOne({ doctorsId: id },
+      const result = await doctorCollection.findOne({ doctorId: id },
         { projection: { schedule: 1 } })
       res.send(result)
     })
@@ -160,7 +161,7 @@ async function run() {
         }
 
         const result = await doctorCollection.updateOne(
-          { doctorsId: id },   // ✅ ঠিক
+          { doctorId: id },   // ✅ ঠিক
           { $set: { schedule: { workingDays, appointmentHours }, updatedAt: new Date() } }
         );
 
@@ -179,7 +180,7 @@ async function run() {
         const { id } = req.params;
 
         const result = await doctorCollection.updateOne(
-          { doctorsId: id },          // ✅ ঠিক
+          { doctorId: id },          // ✅ ঠিক
           {
             $unset: { schedule: "" },
             $set: { updatedAt: new Date() },
@@ -220,34 +221,121 @@ async function run() {
 
     //  Appointments related 
     app.post('/api/appointments', async (req, res) => {
-      const { patientId,patientEmail, doctorId, appointmentDate, appointmentTime, appointmentStatus, symptoms, paymentStatus } = req.body
-      const addData = { patientId,patientEmail, doctorId, appointmentDate, appointmentTime, appointmentStatus, symptoms, paymentStatus,createdAt: new Date() }
-      const result = await appointmentsCollection.insertOne(addData)
-      res.send(result)
-    })
+      try {
+        const {
+          patientId,
+          patientEmail,
+          doctorId,
+          doctorName,
+          patientName,
+          appointmentDate,
+          appointmentTime,
+          appointmentStatus,
+          symptoms,
+          consultationFee,
+          paymentAmount,
+          transactionId,
+          paymentStatus
+        } = req.body;
+
+        // Check already paid
+        const isBookingExit = await appointmentsCollection.findOne({
+          transactionId
+        });
+
+        if (isBookingExit) {
+          return res.status(200).send({
+            message: 'already paid'
+          });
+        }
+
+        // Appointment data
+        const addData = {
+          patientId,
+          patientEmail,
+
+          doctorId,
+          doctorName,
+
+          patientName,
+
+          appointmentDate,
+          appointmentTime,
+          appointmentStatus,
+          symptoms,
+
+          consultationFee,
+
+          paymentAmount,
+          transactionId,
+          paymentStatus,
+
+          bookingDate: new Date()
+        };
+
+        // Save appointment
+        const appointmentResult = await appointmentsCollection.insertOne(addData);
+
+        // Appointment ID
+        const appointmentId = appointmentResult.insertedId;
+
+        // Payment data
+        const paymentData = {
+          appointmentId,
+
+          patientId,
+          doctorId,
+
+          amount: paymentAmount,
+
+          transactionId,
+
+          paymentDate: new Date()
+        };
+
+        // Save payment
+        const paymentResult = await paymentCollection.insertOne(paymentData);
+
+        res.status(201).send({
+          success: true,
+          message: "Appointment and payment saved successfully",
+          appointmentId: appointmentResult.insertedId,
+          paymentId: paymentResult.insertedId
+        });
+
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to create appointment",
+          error: error.message
+        });
+      }
+    });
 
     app.get("/api/appointments", async (req, res) => {
-  try {
-    const { doctorId } = req.query;
+      try {
+        const { doctorId } = req.query;
 
-    console.log("Received doctorId:", doctorId); // ← ডিবাগের জন্য
+        console.log("Received doctorId:", doctorId); // ← ডিবাগের জন্য
 
-    if (!doctorId) {
-      return res.status(400).send({ message: "doctorId is required" });
-    }
+        if (!doctorId) {
+          return res.status(400).send({ message: "doctorId is required" });
+        }
 
-    const appointments = await appointmentsCollection
-      .find({ doctorId: doctorId })
-      .toArray();
+        const appointments = await appointmentsCollection
+          .find({ doctorId: doctorId })
+          .toArray();
 
-    console.log("Found appointments:", appointments.length); // ← কয়টা পাওয়া গেল
+        console.log("Found appointments:", appointments.length); // ← কয়টা পাওয়া গেল
 
-    res.send(appointments);
-  } catch (error) {
-    console.error("Get appointments error:", error);
-    res.status(500).send({ message: "Failed to fetch appointments", error: error.message });
-  }
-});
+        res.send(appointments);
+      } catch (error) {
+        console.error("Get appointments error:", error);
+        res.status(500).send({ message: "Failed to fetch appointments", error: error.message });
+      }
+    });
 
 
 
