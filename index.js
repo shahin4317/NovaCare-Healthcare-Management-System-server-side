@@ -161,7 +161,7 @@ async function run() {
         }
 
         const result = await doctorCollection.updateOne(
-          { doctorId: id },   // ✅ ঠিক
+          { doctorId: id }, 
           { $set: { schedule: { workingDays, appointmentHours }, updatedAt: new Date() } }
         );
 
@@ -218,6 +218,7 @@ async function run() {
       res.send(result)
 
     })
+
 
     //  Appointments related 
     app.post('/api/appointments', async (req, res) => {
@@ -313,19 +314,19 @@ async function run() {
         });
       }
     });
-
-    app.get("/api/appointments", async (req, res) => {
+//for overveiw page 
+    app.get("/api/appointments/patient/:patientId", async (req, res) => {
       try {
-        const { doctorId } = req.query;
+        const { patientId } = req.params
 
-        console.log("Received doctorId:", doctorId); // ← ডিবাগের জন্য
+        console.log("Received patientId:", patientId); // ← ডিবাগের জন্য
 
-        if (!doctorId) {
-          return res.status(400).send({ message: "doctorId is required" });
+        if (!patientId) {
+          return res.status(400).send({ message: "patientId is required" });
         }
 
         const appointments = await appointmentsCollection
-          .find({ doctorId: doctorId })
+          .find({ patientId: patientId })
           .toArray();
 
         console.log("Found appointments:", appointments.length); // ← কয়টা পাওয়া গেল
@@ -336,6 +337,8 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch appointments", error: error.message });
       }
     });
+
+
 
 
 
