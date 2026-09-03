@@ -26,6 +26,8 @@ async function run() {
     const doctorCollection = db.collection('doctors')
     const appointmentsCollection = db.collection('appointments')
     const paymentCollection = db.collection('payments')
+    const prescriptionCollection = db.collection('prescriptions')
+
 
     // Send a ping to confirm a successful connection
     app.post('/api/doctors', async (req, res) => {
@@ -161,7 +163,7 @@ async function run() {
         }
 
         const result = await doctorCollection.updateOne(
-          { doctorId: id }, 
+          { doctorId: id },
           { $set: { schedule: { workingDays, appointmentHours }, updatedAt: new Date() } }
         );
 
@@ -314,7 +316,7 @@ async function run() {
         });
       }
     });
-//for overveiw page 
+    //for overveiw page 
     app.get("/api/appointments/patient/:patientId", async (req, res) => {
       try {
         const { patientId } = req.params
@@ -337,9 +339,105 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch appointments", error: error.message });
       }
     });
+    //for patient 
+    app.get("/api/payments/:patientId", async (req, res) => {
+      const { patientId } = req.params
+      const result = await paymentCollection.find({ patientId: patientId }).toArray()
+      res.send(result)
+    })
+    // for doctors appionmentspage
+    app.get('/api/appointments/doctor/:doctorId', async (req, res) => {
+      const { doctorId } = req.params
+      console.log(doctorId, 'form database');
+      const result = await appointmentsCollection.find({ doctorId: doctorId }).toArray()
+      res.send(result)
+    })
 
+    app.patch('/api/appointments/:id/status', async (req, res) => {
+      const { id } = req.params
+      const updateRequest = req.body
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: {
+          appointmentStatus: updateRequest.appointmentStatus
+        }
+      }
+      const result = await appointmentsCollection.updateOne(filter, updateDoc)
+      res.send(result)
+    })
+    app.patch('/api/appointments/:appointmentId', async (req, res) => {
+      try {
+        const { appointmentId } = req.params;
 
+        const {
+          appointmentDate,
+          appointmentTime,
+          symptoms,
+          appointmentStatus
+        } = req.body;
 
+        const filter = {
+          _id: new ObjectId(appointmentId)
+        };
+
+        const updateDoc = {
+          $set: {
+            appointmentDate,
+            appointmentTime,
+            symptoms,
+            appointmentStatus
+          }
+        };
+
+        const result = await appointmentsCollection.updateOne(
+          filter,
+          updateDoc
+        );
+
+        res.send(result);
+
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to update appointment"
+        });
+      }
+    });
+
+    // for prescriptions
+    app.get("/api/appointments/:appointmentId", async (req, res) => {
+
+      const { appointmentId } = req.params;
+
+      const result = await appointmentsCollection.findOne({
+        _id: new ObjectId(appointmentId)
+      }); 
+
+      res.send(result);
+    });
+    // for prsscriptions
+    app.post('/api/prescriptions', async(req,res)=>{
+      const {appointmentId,
+            patientName,
+            diagnosis,
+            medicine,
+            advice,
+            doctorId,} = req.body
+      const addData = {appointmentId,
+            patientName,
+            diagnosis,
+            medicine,
+            advice,
+            doctorId, createdAt: new Date()}
+      const result = await prescriptionCollection.insertOne(addData)
+      return res.send(result)
+      
+
+    })
+
+    
 
 
 
