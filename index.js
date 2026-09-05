@@ -8,6 +8,7 @@ const uri = process.env.MONGO_DB_URI
 app.use(cors())
 app.use(express.json())
 
+
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -23,6 +24,7 @@ async function run() {
     // const database = client.db('novacare-db')
     // const doctorCollection =database.collection('doctor')
     const db = client.db('novacareUser')
+    const userCollection = db.collection('user')
     const doctorCollection = db.collection('doctors')
     const appointmentsCollection = db.collection('appointments')
     const paymentCollection = db.collection('payments')
@@ -33,7 +35,7 @@ async function run() {
     app.post('/api/doctors', async (req, res) => {
       const { doctorId, doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization } = req.body
       const addData = {
-        doctorId, doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization, createdAt: new Date(), status: 'active'
+        doctorId, doctorsEmail, consultationFee, doctorName, experience, hospitalName, profileImage, qualifications, specialization, createdAt: new Date(), status: 'not verified'
       }
       const result = await doctorCollection.insertOne(addData)
       return res.send(result)
@@ -72,7 +74,7 @@ async function run() {
           specialization,
 
           updatedAt: new Date(),
-          status: "active"
+          status: "Not Verified"
         };
         const result = await doctorCollection.updateOne(
           { doctorId: id },
@@ -413,31 +415,181 @@ async function run() {
 
       const result = await appointmentsCollection.findOne({
         _id: new ObjectId(appointmentId)
-      }); 
+      });
 
       res.send(result);
     });
     // for prsscriptions
-    app.post('/api/prescriptions', async(req,res)=>{
-      const {appointmentId,
-            patientName,
-            diagnosis,
-            medicine,
-            advice,
-            doctorId,} = req.body
-      const addData = {appointmentId,
-            patientName,
-            diagnosis,
-            medicine,
-            advice,
-            doctorId, createdAt: new Date()}
+    app.post('/api/prescriptions', async (req, res) => {
+      const { appointmentId,
+        patientName,
+        diagnosis,
+        medicine,
+        advice,
+        doctorId, } = req.body
+      const addData = {
+        appointmentId,
+        patientName,
+        diagnosis,
+        medicine,
+        advice,
+        doctorId, createdAt: new Date()
+      }
       const result = await prescriptionCollection.insertOne(addData)
       return res.send(result)
-      
+
+
+    })
+    app.get("/api/prescriptions/:appointmentId", async (req, res) => {
+      try {
+        const { appointmentId } = req.params;
+
+        const prescription = await prescriptionCollection.findOne({
+          appointmentId: appointmentId,
+        });
+
+        if (!prescription) {
+          return res.status(404).send({
+            message: "Prescription not found",
+          });
+        }
+
+        res.send(prescription);
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          message: "Failed to get prescription",
+        });
+      }
+    });
+
+    // for admin 
+    app.get('/api/user', async (req, res) => {
+      const cursore = userCollection.find()
+      const result = await cursore.toArray()
+      res.send(result)
+
+    })
+    app.delete("/api/user/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        ;
+
+        const result = await userCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+
+
+        if (result.deletedCount === 0) {
+          return res.status(404).send({
+            success: false,
+            message: "User not found",
+          });
+        }
+
+        res.send({
+          success: true,
+          message: "User deleted successfully",
+        });
+
+      } catch (error) {
+
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to delete user",
+        });
+      }
+    });
+    app.get('/api/payments', async (req, res) => {
+
+      const cursore = paymentCollection.find()
+      const result = await cursore.toArray()
+      res.send(result)
+    })
+
+    app.get('/api/appointments', async (req, res) => {
+      const cursore = appointmentsCollection.find()
+      const result = await cursore.toArray()
+      res.send(result)
+    })
+
+
+    app.patch("/api/doctor/status/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        console.log("User ID received:", id);
+
+        // Find doctor using BetterAuth user ID
+        const doctor = await doctorCollection.findOne({
+          doctorId: id,
+        });
+
+        console.log("Doctor found:", doctor);
+
+        if (!doctor) {
+          return res.status(404).send({
+            success: false,
+            message: "Doctor not found",
+          });
+        }
+
+        // Toggle status
+        const newStatus =
+          doctor.status === "Active"
+            ? "Not Verified"
+            : "Active";
+
+        const result = await doctorCollection.updateOne(
+          {
+            doctorId: id,
+          },
+          {
+            $set: {
+              status: newStatus,
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        if (result.modifiedCount === 0) {
+          return res.status(400).send({
+            success: false,
+            message: "Status was not updated",
+          });
+        }
+
+        return res.status(200).send({
+          success: true,
+          message:
+            newStatus === "Active"
+              ? "Doctor verified successfully"
+              : "Doctor verification cancelled",
+          status: newStatus,
+        });
+      } catch (error) {
+        console.error(
+          "Doctor status update error:",
+          error
+        );
+
+        return res.status(500).send({
+          success: false,
+          message: "Failed to update doctor status",
+        });
+      }
+    });
+   app.get('/api/appointments', async (req, res) => {
+      const cursore = appointmentsCollection.find()
+      const result = await cursore.toArray()
+      res.send(result)
 
     })
 
-    
 
 
 
